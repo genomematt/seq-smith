@@ -1,0 +1,12 @@
+[package]
+name = "seq_align"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+pyo3 = { version = "0.21.2", features = ["extension-module", "generate-import-lib"] }
+numpy = "0.21.0"
+
+[lib]
+name = "seq_align"
+crate-type = ["cdylib"]
