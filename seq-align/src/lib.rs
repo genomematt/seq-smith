@@ -61,18 +61,48 @@ struct Alignment {
     score: i32,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct Direction(i32);
+
+enum DirectionKind {
+    Match,
+    Stop,
+    GapA(i32),
+    GapB(i32),
+}
+
+impl Direction {
+    const MATCH: Self = Self(0);
+    const STOP: Self = Self(i32::MIN);
+
+    fn gap_a(len: i32) -> Self {
+        debug_assert!(len > 0);
+        Self(-len)
+    }
+
+    fn gap_b(len: i32) -> Self {
+        debug_assert!(len > 0);
+        Self(len)
+    }
+
+    fn kind(&self) -> DirectionKind {
+        match self.0 {
+            0 => DirectionKind::Match,
+            i32::MIN => DirectionKind::Stop,
+            val if val < 0 => DirectionKind::GapA(-val),
+            val => DirectionKind::GapB(val),
+        }
+    }
+}
 
 
-fn traceback(dir_matrix: &[i32], sb_len: usize, s_col: usize, s_row: usize) -> Vec<AlignFrag> {
+fn traceback(dir_matrix: &[Direction], sb_len: usize, s_col: usize, s_row: usize) -> Vec<AlignFrag> {
     let mut result = Vec::new();
     let mut s_col = s_col as i32;
     let mut s_row = s_row as i32;
 
     while s_col >= 0 && s_row >= 0 {
-        let d = dir_matrix[(s_col as usize) * sb_len + (s_row as usize)];
-        if d == std::i32::MIN {
-            break;
-        }
+        let d_kind = dir_matrix[(s_col as usize) * sb_len + (s_row as usize)].kind();
 
         let mut temp = AlignFrag {
             frag_type: FragType::Match,
@@ -81,26 +111,34 @@ fn traceback(dir_matrix: &[i32], sb_len: usize, s_col: usize, s_row: usize) -> V
             len: 0,
         };
 
-        if d < 0 {
-            s_row -= -d;
-            temp.frag_type = FragType::AGap;
-            temp.len = -d;
-        } else if d > 0 {
-            s_col -= d;
-            temp.frag_type = FragType::BGap;
-            temp.len = d;
-        } else {
-            let mut count = 0;
-            loop {
-                s_col -= 1;
-                s_row -= 1;
-                count += 1;
-                if s_col < 0 || s_row < 0 || dir_matrix[(s_col as usize) * sb_len + (s_row as usize)] != 0 {
-                    break;
-                }
+        match d_kind {
+            DirectionKind::Stop => break,
+            DirectionKind::GapA(len) => {
+                s_row -= len;
+                temp.frag_type = FragType::AGap;
+                temp.len = len;
             }
-            temp.frag_type = FragType::Match;
-            temp.len = count;
+            DirectionKind::GapB(len) => {
+                s_col -= len;
+                temp.frag_type = FragType::BGap;
+                temp.len = len;
+            }
+            DirectionKind::Match => {
+                let mut count = 0;
+                loop {
+                    s_col -= 1;
+                    s_row -= 1;
+                    count += 1;
+                    if s_col < 0 || s_row < 0 {
+                        break;
+                    }
+                    if !matches!(dir_matrix[(s_col as usize) * sb_len + (s_row as usize)].kind(), DirectionKind::Match) {
+                        break;
+                    }
+                }
+                temp.frag_type = FragType::Match;
+                temp.len = count;
+            }
         }
         temp.sa_start = s_col + 1;
         temp.sb_start = s_row + 1;
@@ -111,7 +149,7 @@ fn traceback(dir_matrix: &[i32], sb_len: usize, s_col: usize, s_row: usize) -> V
 }
 
 fn global_traceback(
-    dir_matrix: &[i32],
+    dir_matrix: &[Direction],
     sb_len: usize,
     s_col: usize,
     s_row: usize,
@@ -121,7 +159,7 @@ fn global_traceback(
     let mut s_row = s_row as i32;
 
     while s_col >= 0 && s_row >= 0 {
-        let d = dir_matrix[(s_col as usize) * sb_len + (s_row as usize)];
+        let d_kind = dir_matrix[(s_col as usize) * sb_len + (s_row as usize)].kind();
 
         let mut temp = AlignFrag {
             frag_type: FragType::Match,
@@ -130,29 +168,34 @@ fn global_traceback(
             len: 0,
         };
 
-        if d < 0 {
-            s_row -= -d;
-            temp.frag_type = FragType::AGap;
-            temp.len = -d;
-        } else if d > 0 {
-            s_col -= d;
-            temp.frag_type = FragType::BGap;
-            temp.len = d;
-        } else {
-            let mut count = 0;
-            loop {
-                s_col -= 1;
-                s_row -= 1;
-                count += 1;
-                if s_col < 0
-                    || s_row < 0
-                    || dir_matrix[(s_col as usize) * sb_len + (s_row as usize)] != 0
-                {
-                    break;
-                }
+        match d_kind {
+            DirectionKind::Stop => break, // Should not happen in global
+            DirectionKind::GapA(len) => {
+                s_row -= len;
+                temp.frag_type = FragType::AGap;
+                temp.len = len;
             }
-            temp.frag_type = FragType::Match;
-            temp.len = count;
+            DirectionKind::GapB(len) => {
+                s_col -= len;
+                temp.frag_type = FragType::BGap;
+                temp.len = len;
+            }
+            DirectionKind::Match => {
+                let mut count = 0;
+                loop {
+                    s_col -= 1;
+                    s_row -= 1;
+                    count += 1;
+                    if s_col < 0 || s_row < 0 {
+                        break;
+                    }
+                    if !matches!(dir_matrix[(s_col as usize) * sb_len + (s_row as usize)].kind(), DirectionKind::Match) {
+                        break;
+                    }
+                }
+                temp.frag_type = FragType::Match;
+                temp.len = count;
+            }
         }
         temp.sa_start = s_col + 1;
         temp.sb_start = s_row + 1;
@@ -205,7 +248,7 @@ fn local_align(
 
     let mut curr_score = vec![0; sb_len];
     let mut prev_score = vec![0; sb_len];
-    let mut dir_matrix = vec![0; sa_len * sb_len];
+    let mut dir_matrix = vec![Direction::STOP; sa_len * sb_len];
     let mut hgap_pos = vec![0; sb_len];
     let mut hgap_score = vec![0; sb_len];
 
@@ -224,22 +267,22 @@ fn local_align(
         let mut vgap_score = gap_open;
 
         let mut score = score_matrix[[sa[col] as usize, sb[0] as usize]];
-        let mut dir = 0;
+        let mut dir = Direction::MATCH;
 
         if score < vgap_score {
             score = vgap_score;
-            dir = -(0 - vgap_pos);
+            dir = Direction::gap_a(0 - vgap_pos);
         }
 
         if score < hgap_score[0] {
             score = hgap_score[0];
-            dir = col as i32 - hgap_pos[0];
+            dir = Direction::gap_b(col as i32 - hgap_pos[0]);
         }
 
         if score < 0 {
             curr_score[0] = 0;
             score = 0;
-            dir_matrix[col * sb_len] = std::i32::MIN;
+            dir_matrix[col * sb_len] = Direction::STOP;
         } else {
             curr_score[0] = score;
             dir_matrix[col * sb_len] = dir;
@@ -266,22 +309,22 @@ fn local_align(
 
         for row in 1..sb_len {
             score = prev_score[row - 1] + score_matrix[[sa[col] as usize, sb[row] as usize]];
-            dir = 0;
+            dir = Direction::MATCH;
 
             if score < vgap_score {
                 score = vgap_score;
-                dir = -((row as i32) - vgap_pos);
+                dir = Direction::gap_a((row as i32) - vgap_pos);
             }
 
             if score < hgap_score[row] {
                 score = hgap_score[row];
-                dir = col as i32 - hgap_pos[row];
+                dir = Direction::gap_b(col as i32 - hgap_pos[row]);
             }
 
             if score < 0 {
                 curr_score[row] = 0;
                 score = 0;
-                dir_matrix[col * sb_len + row] = std::i32::MIN;
+                dir_matrix[col * sb_len + row] = Direction::STOP;
             } else {
                 curr_score[row] = score;
                 dir_matrix[col * sb_len + row] = dir;
@@ -342,7 +385,7 @@ fn global_align(
 
     let mut curr_score = vec![0; sb_len];
     let mut prev_score = vec![0; sb_len];
-    let mut dir_matrix = vec![0; sa_len * sb_len];
+    let mut dir_matrix = vec![Direction::MATCH; sa_len * sb_len];
     let mut hgap_pos = vec![0; sb_len];
     let mut hgap_score = vec![0; sb_len];
 
@@ -362,16 +405,16 @@ fn global_align(
             } else {
                 0
             });
-        let mut dir = 0;
+        let mut dir = Direction::MATCH;
 
         if score < vgap_score {
             score = vgap_score;
-            dir = -(0 - vgap_pos);
+            dir = Direction::gap_a(0 - vgap_pos);
         }
 
         if score < hgap_score[0] {
             score = hgap_score[0];
-            dir = col as i32 - hgap_pos[0];
+            dir = Direction::gap_b(col as i32 - hgap_pos[0]);
         }
 
         curr_score[0] = score;
@@ -393,16 +436,16 @@ fn global_align(
 
         for row in 1..sb_len {
             score = prev_score[row - 1] + score_matrix[[sa[col] as usize, sb[row] as usize]];
-            dir = 0;
+            dir = Direction::MATCH;
 
             if score < vgap_score {
                 score = vgap_score;
-                dir = -((row as i32) - vgap_pos);
+                dir = Direction::gap_a((row as i32) - vgap_pos);
             }
 
             if score < hgap_score[row] {
                 score = hgap_score[row];
-                dir = col as i32 - hgap_pos[row];
+                dir = Direction::gap_b(col as i32 - hgap_pos[row]);
             }
 
             curr_score[row] = score;
@@ -459,7 +502,7 @@ fn glocal_align(
 
     let mut curr_score = vec![0; sb_len];
     let mut prev_score = vec![0; sb_len];
-    let mut dir_matrix = vec![0; sa_len * sb_len];
+    let mut dir_matrix = vec![Direction::MATCH; sa_len * sb_len];
     let mut hgap_pos = vec![0; sb_len];
     let mut hgap_score = vec![0; sb_len];
 
@@ -475,7 +518,7 @@ fn glocal_align(
 
     for col in 0..sa_len {
         let mut score = score_matrix[[sa[col] as usize, sb[0] as usize]];
-        let mut dir = 0;
+        let dir = Direction::MATCH;
 
         curr_score[0] = score;
         dir_matrix[col * sb_len] = dir;
@@ -485,16 +528,16 @@ fn glocal_align(
 
         for row in 1..sb_len - 1 {
             score = prev_score[row - 1] + score_matrix[[sa[col] as usize, sb[row] as usize]];
-            dir = 0;
+            let mut dir = Direction::MATCH;
 
             if score < vgap_score {
                 score = vgap_score;
-                dir = -((row as i32) - vgap_pos);
+                dir = Direction::gap_a((row as i32) - vgap_pos);
             }
 
             if score < hgap_score[row] {
                 score = hgap_score[row];
-                dir = col as i32 - hgap_pos[row];
+                dir = Direction::gap_b(col as i32 - hgap_pos[row]);
             }
 
             curr_score[row] = score;
@@ -516,7 +559,7 @@ fn glocal_align(
         }
 
         score = prev_score[sb_len - 2] + score_matrix[[sa[col] as usize, sb[sb_len - 1] as usize]];
-        dir = 0;
+        let dir = Direction::MATCH;
 
         curr_score[sb_len - 1] = score;
         dir_matrix[col * sb_len + sb_len - 1] = dir;
@@ -561,7 +604,7 @@ fn overlap_align(
 
     let mut curr_score = vec![0; sb_len];
     let mut prev_score = vec![0; sb_len];
-    let mut dir_matrix = vec![0; sa_len * sb_len];
+    let mut dir_matrix = vec![Direction::MATCH; sa_len * sb_len];
     let mut hgap_pos = vec![0; sb_len];
     let mut hgap_score = vec![0; sb_len];
 
@@ -573,7 +616,7 @@ fn overlap_align(
         curr_score[row] = score_matrix[[sa[0] as usize, sb[row] as usize]];
         hgap_pos[row] = 0;
         hgap_score[row] = curr_score[row] + gap_open;
-        dir_matrix[row] = 0;
+        dir_matrix[row] = Direction::MATCH;
     }
 
     if curr_score[sb_len - 1] >= max_score {
@@ -589,28 +632,30 @@ fn overlap_align(
         let score_val = score_matrix[[sa[col] as usize, sb[0] as usize]];
         curr_score[0] = score_val;
         score = score_val;
-        dir_matrix[col * sb_len] = 0;
+        dir_matrix[col * sb_len] = Direction::MATCH;
         let mut vgap_pos = 0;
         let mut vgap_score = score + gap_open;
 
         for row in 1..sb_len {
             score = prev_score[row - 1] + score_matrix[[sa[col] as usize, sb[row] as usize]];
-            let mut dir = 0;
+            let mut dir = Direction::MATCH;
 
             if score < vgap_score {
                 score = vgap_score;
-                dir = -((row as i32) - vgap_pos);
+                dir = Direction::gap_a((row as i32) - vgap_pos);
             }
 
             if score < hgap_score[row] {
                 score = hgap_score[row];
-                dir = col as i32 - hgap_pos[row];
+                dir = Direction::gap_b(col as i32 - hgap_pos[row]);
             }
 
             curr_score[row] = score;
             dir_matrix[col * sb_len + row] = dir;
 
-            if dir >= 0 && score + gap_open >= vgap_score + gap_extend {
+            let is_gap_a = matches!(dir.kind(), DirectionKind::GapA(_));
+
+            if !is_gap_a && score + gap_open >= vgap_score + gap_extend {
                 vgap_score = score + gap_open;
                 vgap_pos = row as i32;
             }
@@ -618,7 +663,9 @@ fn overlap_align(
                 vgap_score += gap_extend;
             }
 
-            if dir <= 0 && score + gap_open >= hgap_score[row] + gap_extend {
+            let is_gap_b =  matches!(dir.kind(), DirectionKind::GapB(_));
+
+            if !is_gap_b && score + gap_open >= hgap_score[row] + gap_extend {
                 hgap_score[row] = score + gap_open;
                 hgap_pos[row] = col as i32;
             }
@@ -637,7 +684,7 @@ fn overlap_align(
 
     let col = sa_len - 1;
     let mut score = score_matrix[[sa[col] as usize, sb[0] as usize]];
-    dir_matrix[col * sb_len] = 0;
+    dir_matrix[col * sb_len] = Direction::MATCH;
     let mut vgap_pos = 0;
     let mut vgap_score = score + gap_open;
 
@@ -648,17 +695,17 @@ fn overlap_align(
     }
 
     for row in 1..sb_len {
-        let mut dir = 0;
+        let mut dir = Direction::MATCH;
         score = prev_score[row - 1] + score_matrix[[sa[col] as usize, sb[row] as usize]];
 
         if score < vgap_score {
             score = vgap_score;
-            dir = -((row as i32) - vgap_pos);
+            dir = Direction::gap_a((row as i32) - vgap_pos);
         }
 
         if score < hgap_score[row] {
             score = hgap_score[row];
-            dir = col as i32 - hgap_pos[row];
+            dir = Direction::gap_b(col as i32 - hgap_pos[row]);
         }
 
         curr_score[row] = score;
