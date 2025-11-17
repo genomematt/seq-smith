@@ -37,6 +37,7 @@ repos:
     rev: v1.18.2
     hooks:
       - id: mypy
+        exclude: "docs/"
         args:
           [
             --pretty,
@@ -45,5 +46,6 @@ repos:
             --ignore-missing-imports,
             --install-types,
             --non-interactive,
+            --config-file=./pyproject.toml
           ]
         additional_dependencies: [types-PyYAML==6.0.4, types-toml]
