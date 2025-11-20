@@ -49,28 +49,23 @@ jobs:
           name: wheels-${{ matrix.os }}
           path: ./wheelhouse/*.whl
 
-  create_release:
-    name: Create GitHub Release
+  upload_release_assets:
+    name: Upload Assets to Release
     runs-on: ubuntu-latest
-    needs: [build_wheels] # Depends on the wheel-building job to succeed
+    needs: [build_wheels]
+
+    permissions:
+      contents: write
 
     steps:
-    - name: Download all wheels artifacts
-      uses: actions/download-artifact@v4
-      with:
-        path: artifacts
+      - name: Download all wheels artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
 
-    # Create the GitHub Release
-    - name: Create GitHub Release
-      id: create_release
-      uses: softprops/action-gh-release@v2
-      with:
-        # tag_name is automatically inferred from the push tag
-        draft: true # Optional: Create as a draft first
-        prerelease: false
-        generate_release_notes: true
-        # Add all the wheels from the downloaded artifacts to the release
-        files: artifacts/**/*.whl 
-
-    - name: Release URL
-      run: echo "Release created at ${{ steps.create_release.outputs.url }}"
+      - name: Upload Wheels
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.release.tag_name }}
+          files: artifacts/**/*.whl 
+          overwrite_files: true
