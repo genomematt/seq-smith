@@ -67,5 +67,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.release.tag_name }}
-          files: artifacts/**/*.whl 
+          files: artifacts/**/*.whl
           overwrite_files: true
