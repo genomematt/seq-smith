@@ -7,6 +7,13 @@ import typing
 import numpy as np
 
 @typing.final
+class Alignment:
+    @property
+    def fragments(self) -> builtins.list[AlignmentFragment]: ...
+    @property
+    def score(self) -> builtins.int: ...
+
+@typing.final
 class AlignmentFragment:
     @property
     def fragment_type(self) -> FragmentType: ...
@@ -18,13 +25,6 @@ class AlignmentFragment:
     def sb_start(self) -> builtins.int: ...
     @property
     def len(self) -> builtins.int: ...
-
-@typing.final
-class Alignment:
-    @property
-    def fragments(self) -> builtins.list[AlignmentFragment]: ...
-    @property
-    def score(self) -> builtins.int: ...
 
 @typing.final
 class FragmentType(enum.Enum):
@@ -39,6 +39,14 @@ def global_align(
     gap_open: builtins.int,
     gap_extend: builtins.int,
 ) -> Alignment: ...
+def global_align_many(
+    seqa: bytes,
+    seqbs: typing.Sequence[bytes],
+    score_matrix: np.typing.NDArray[np.int32],
+    gap_open: builtins.int,
+    gap_extend: builtins.int,
+    num_threads: builtins.int | None = None,
+) -> builtins.list[Alignment]: ...
 def local_align(
     seqa: bytes,
     seqb: bytes,
@@ -46,6 +54,14 @@ def local_align(
     gap_open: builtins.int,
     gap_extend: builtins.int,
 ) -> Alignment: ...
+def local_align_many(
+    seqa: bytes,
+    seqbs: typing.Sequence[bytes],
+    score_matrix: np.typing.NDArray[np.int32],
+    gap_open: builtins.int,
+    gap_extend: builtins.int,
+    num_threads: builtins.int | None = None,
+) -> builtins.list[Alignment]: ...
 def local_global_align(
     seqa: bytes,
     seqb: bytes,
@@ -53,6 +69,14 @@ def local_global_align(
     gap_open: builtins.int,
     gap_extend: builtins.int,
 ) -> Alignment: ...
+def local_global_align_many(
+    seqa: bytes,
+    seqbs: typing.Sequence[bytes],
+    score_matrix: np.typing.NDArray[np.int32],
+    gap_open: builtins.int,
+    gap_extend: builtins.int,
+    num_threads: builtins.int | None = None,
+) -> builtins.list[Alignment]: ...
 def overlap_align(
     seqa: bytes,
     seqb: bytes,
@@ -60,3 +84,11 @@ def overlap_align(
     gap_open: builtins.int,
     gap_extend: builtins.int,
 ) -> Alignment: ...
+def overlap_align_many(
+    seqa: bytes,
+    seqbs: typing.Sequence[bytes],
+    score_matrix: np.typing.NDArray[np.int32],
+    gap_open: builtins.int,
+    gap_extend: builtins.int,
+    num_threads: builtins.int | None = None,
+) -> builtins.list[Alignment]: ...
