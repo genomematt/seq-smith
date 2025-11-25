@@ -3,7 +3,7 @@ import numpy as np
 from ._seq_smith import Alignment, AlignmentFragment, FragmentType
 
 
-def make_score_matrix(alphabet: str, match_score: int, mismatch_score: int) -> np.ndarray:
+def make_score_matrix(alphabet: str, match_score: int, mismatch_score: int, ambiguous:str, ambiguous_match_score: int | None) -> np.ndarray:
     """
     Creates a scoring matrix for a given alphabet.
 
@@ -11,15 +11,20 @@ def make_score_matrix(alphabet: str, match_score: int, mismatch_score: int) -> n
         alphabet (str): A string containing all characters in the alphabet.
         match_score (int): The score for a match.
         mismatch_score (int): The score for a mismatch.
+        ambiguous (str): Characters that represent an ambiguous match.
+        ambiguous_match_score (int): The score for a ambiguous match.
 
     Returns:
         numpy.ndarray: A 2D numpy array representing the scoring matrix.
     """
     alpha_len = len(alphabet)
     score_matrix = np.full((alpha_len, alpha_len), mismatch_score, dtype=np.int32)
+    for i in range(0,len(alphabet)):
+        if alphabet[i] in ambiguous:
+            score_matrix[i, :] = ambiguous_match_score
+            score_matrix[:, i] = ambiguous_match_score
     np.fill_diagonal(score_matrix, match_score)
     return score_matrix
-
 
 def encode(seq: str, alphabet: str) -> bytes:
     """
